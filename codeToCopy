@@ -1,0 +1,188 @@
+function rootFunc() {
+    // overlay component
+    function overlay() {
+        var obj = {}, show = false,
+            el = document.createElement("div");
+        el.style = "overflow-y:scroll; position: fixed;height: 100%;width: 100%;z-index: 9999;background: white;display:none;";
+        document.body.appendChild(el);
+        obj.toggleview = function () {
+            if (show) {
+                el.style.display = "none";
+                document.body.style.overflow = "";
+                el.style.overflow = "";
+            }
+            else {
+                el.style.display = "";
+                document.body.style.overflow = "hidden";
+                el.style.overflow = "hidden";
+            }
+            show = !show;
+        }
+        obj.el = el;
+        return obj;
+    }
+    var ol = new overlay();
+    // append html 
+    ol.el.innerHTML = `
+        <style>
+        .canvas {
+            background:none;
+            padding:0px;
+            margin: 0px;
+            border:none;
+            position: absolute;
+            padding:0px;
+            margin:0px;
+            top: 0px;
+            left: 0px;
+            height:100%;
+            width:100%;
+        }
+        </style>
+        <canvas class="canvas">
+        </canvas>
+    `;
+    function audioData() {
+        var obj = {}, analyser, loopF;
+        var uArr = new Uint8Array(100);
+        obj.datafunc = () => { };
+        function loop() {
+            analyser.getByteFrequencyData(uArr);
+            obj.datafunc(uArr);
+            loopF = requestAnimationFrame(loop);
+        }
+        function start() {
+            window.focus();
+            var audioContext = new AudioContext();
+            analyser = audioContext.createAnalyser();
+            var source = audioContext.createMediaElementSource(obj.audioElement);
+            source.connect(analyser);
+            analyser.connect(audioContext.destination);
+            loop();
+        }
+        obj.start = start;
+        return obj;
+    }
+    //------------------------------ canvas functions------------------------------
+    var canv = document.getElementsByClassName("canvas")[0],
+        ctx = canv.getContext("2d");
+    function init() {
+        var bh = window.innerHeight,
+            bw = window.innerWidth;
+        canv.height = bh;
+        canv.width = bw;
+        canv.center = { x: bw / 2, y: bh / 2 };
+    }
+    init();
+    window.addEventListener("resize", init);
+    function makeCircle(size) {
+        this.size = size;
+        this.color = "black";
+        this.pos = { x: canv.width / 2, y: canv.height / 2 };
+        this.velocity = 0.2;
+        this.angle = { x: 1, y: 1 };
+    }
+    makeCircle.prototype.radians = function (d) {
+        this.angle.x = Math.sin(d);
+        this.angle.y = Math.cos(d);
+    }
+    makeCircle.prototype.draw = function (cmd) {
+        ctx.beginPath();
+        ctx.arc(this.pos.x, this.pos.y, this.size, 0, 2 * Math.PI);
+        if (cmd == "fill") {
+            ctx.fillStyle = this.color;
+            ctx.fill();
+        }
+        else {
+            ctx.strokeStyle = this.color;
+            ctx.stroke();
+        }
+        ctx.closePath();
+    }
+    var circle = new makeCircle(200), moveSpeed = 1, count = 0, clearRate = 0.1, particles = [];
+    var pc = 0;
+    var sl = setInterval(function () {
+        var nP = new makeCircle(2);
+        nP.radians(pc);
+        nP.velocity = 2;
+        nP.color = "white";
+        particles.push(nP);
+        pc++;
+        if (pc >= 200) { clearInterval(sl); }
+    }, 100);
+    function loop() {
+        // canvas effect
+        ctx.beginPath();
+        ctx.rect(0, 0, canv.width, canv.height);
+        ctx.fillStyle = "rgba(0,0,0," + clearRate + ")";
+        ctx.fill();
+        particles.forEach(each => {
+            each.pos.x += each.angle.x * each.velocity;
+            each.pos.y += each.angle.y * each.velocity;
+            if (each.pos.x > 2000 || each.pos.x < 0 || (each.pos.y > 2000 || each.pos.y < 0)) { each.pos.x = canv.width / 2; each.pos.y = canv.height / 2; }
+            each.draw("fill");
+        });
+    }
+    //------------------------------ canvas functions------------------------------
+    var md = new audioData();
+    md.audioElement = document.querySelector("video")||document.querySelector("audio");    // audio source element
+    md.datafunc = function (d) {
+        var l = d.slice(0, 33); // low
+        var m = d.slice(33, 66); // mid
+        var h = d.slice(-33); // high
+
+        var vfbc = l.slice(0, 10).sort()[0],
+            vfsc = m.sort((a, b) => b - a)[0],
+            vfpc = vfbc;
+        particles.forEach(each => {
+            if (vfbc < 1) { each.velocity = 1; }
+            else { each.velocity = vfpc * 0.03; }
+        });
+        circle.pos = canv.center;
+        circle.size = vfbc * 1.4;
+        ctx.lineWidth = 5;
+        circle.draw("stroke");
+        ctx.save();
+        ctx.setLineDash([8]);
+        ctx.lineWidth = 20;
+        circle.size = vfsc / 1.4;
+        circle.draw("stroke");
+        ctx.restore();
+		loop();
+    };
+    md.start();
+    /*color palettes */
+       var colors = ["#032d3c", "#4be3ac", "#94fc13", "#f7ff56", "red"];
+    // var colors = ["#eee3e7" , "#ead5dc" , "#eec9d2" , "#f4b6c2" , "#f6abb6"];
+    // var colors = ["#fe4a49" , "#2ab7ca" , "#fed766" , "#e6e6ea" , "#f4f4f8"];
+    // var colors = ["white", "white"];
+    function changeColor() {
+        var color = colors.indexOf(circle.color) + 1; // jumping to next color index
+        if (color >= colors.length) { color = 0; }
+        circle.color = colors[color];
+        particles.forEach(each => each.color = colors[color]);
+    }
+    setInterval(changeColor, 500);
+
+function smallScreenToggle(){
+    if(ol.el.style.height == "100%"){
+        ol.el.style.height = "30%";
+        ol.el.style.width = "30%";        
+    }
+    else{
+        ol.el.style.height = "100%";
+        ol.el.style.width = "100%";              
+    }
+}
+
+    // keyboard event
+    window.addEventListener("keydown", function (e) {
+        if (e.keyCode == 86 && e.altKey) {
+            ol.toggleview();
+        }
+        if(e.keyCode == 27){
+            smallScreenToggle();
+        }
+    }, false);
+}
+rootFunc();
